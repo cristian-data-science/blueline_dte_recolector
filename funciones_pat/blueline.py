@@ -85,7 +85,7 @@ class funciones_globales():
         df.to_excel("nuevo_Rep.xlsx", index = False)
 
     
-
+    def to_gsheet(self):
 
 
 

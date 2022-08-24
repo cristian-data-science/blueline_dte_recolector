@@ -63,7 +63,7 @@ class base_test(unittest.TestCase):
         f.login_blue(v.url_blue_line, v.user_blueline, v.pass_blueline)
         f.dte_emitidos(v.url_dte_emitidos)
         f.cargar_datos()
-
+        f.to_gsheet()
 
 
     def tearDown(self):
