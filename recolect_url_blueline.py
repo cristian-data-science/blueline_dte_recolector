@@ -10,6 +10,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 from funciones_pat.blueline import funciones_globales
 
+
 from selenium.webdriver.common.action_chains import ActionChains
 import os
 
@@ -27,7 +28,7 @@ chrome_options.add_argument('--disable-dev-shm-usage')
 chrome_options.add_argument('--no-sandbox')
 
 
-import variables as v
+from funciones_pat import var as v
 
 class base_test(unittest.TestCase):
 
@@ -62,7 +63,8 @@ class base_test(unittest.TestCase):
         f = funciones_globales(driver)
         f.login_blue(v.url_blue_line, v.user_blueline, v.pass_blueline)
         f.dte_emitidos(v.url_dte_emitidos)
-        f.cargar_datos()
+        f.limpiar_reporte()
+        f.sql_cross()
         f.to_gsheet()
 
 

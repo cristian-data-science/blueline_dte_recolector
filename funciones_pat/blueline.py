@@ -13,11 +13,15 @@ from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.select import Select
 
+import pymssql
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 
 import sys
 sys.path.append("variables")
-import variables as v
+from funciones_pat import var as v
+#from funciones_pat import driven-token.json as token
 
 
 class funciones_globales():
@@ -75,18 +79,66 @@ class funciones_globales():
         sleep(1)
 
 
-    def cargar_datos(self):
-        print("### Limpiando datos y generando nuevo reporte ###")
+    def limpiar_reporte(self):
+        print("### Limpiando datos y creando nuevo archivo ###")
         df = pd.read_excel("Reporte.xls")        
         df['MOTIVO SII'] = df['MOTIVO SII'].fillna("No Informado")
         df = df.fillna(0)
         df['INVOICENUMBER'] = ("39-" + df['FOLIO'].map(str))
-        print(df)
+        #print(df)
         df.to_excel("nuevo_Rep.xlsx", index = False)
+
+    def sql_cross(self):
+        print("### Cruzando datos de BlueLine contra ERP ###")
+        conn = pymssql.connect(v.server, v.username, v.password, v.database)
+        cursor = conn.cursor(as_dict=True)
+
+        cursor.execute("SELECT DISTINCT(SALESORDERNUMBER) AS SALESORDERNUMBER, DELIVERYADDRESSNAME, CUSTOMERREQUISITIONNUMBER as OC, CUSTOMSDOCUMENTDATE FROM SalesOrderLineV2Staging WHERE CUSTOMERREQUISITIONNUMBER <> '' AND CUSTOMSDOCUMENTDATE BETWEEN GETDATE() -30  and GETDATE() ")
+        df_sales_order = pd.DataFrame(cursor.fetchall())
+        #df_sales_order
+
+        cursor.execute("SELECT SALESORDERNUMBER, INVOICENUMBER, INVOICEDATE FROM SalesInvoiceHeaderV2Staging WHERE INVOICEDATE BETWEEN GETDATE() -30  and GETDATE() ")
+        df_sales_invoice = pd.DataFrame(cursor.fetchall())
+        print("### Generando nuevo reporte maestro ###")
+        df_sql = df_sales_invoice.merge(df_sales_order, how='left', on='SALESORDERNUMBER')
+        df_sql = df_sql.dropna()
+
+        df_excel = pd.read_excel("nuevo_Rep.xlsx")
+        df_final = df_sql.merge(df_excel, how='right', on='INVOICENUMBER')
+
+        df_final = df_final.dropna()
+        df_final.to_excel("finalfinal.xlsx")
+        cursor.close()
+        conn.close()
 
     
     def to_gsheet(self):
+        print("### Enviando resultados a Google Sheet blueline_dte_autoV2 ###")
+        # Setting up with the connection
+        # The json file downloaded needs to be in the same folder
 
+        scope = ['https://www.googleapis.com/auth/spreadsheets',
+                 "https://www.googleapis.com/auth/drive"]
+
+        credentials = ServiceAccountCredentials.from_json_keyfile_name('drive-token.json', scope)
+
+        gc = gspread.authorize(credentials)
+        # Establish the connection
+        # database is the googleSpreadSheet name
+
+        #database = gc.create("blueline_dte_autoV2")
+        #database.share('cgutierrez.infor@gmail.com', perm_type='user', role='writer')
+
+        database = gc.open("blueline_dte_autoV2")
+        wks = database.worksheet("url")
+        df = pd.read_excel("finalfinal.xlsx")
+        df = df.drop(columns = ["CUSTOMSDOCUMENTDATE"]) 
+        df = df.drop(columns = ["DELIVERYADDRESSNAME"]) 
+        df['INVOICEDATE'] = df['INVOICEDATE'].astype(str)
+
+
+        # export df to a sheet
+        wks.update([df.columns.values.tolist()] + df.values.tolist())
 
 
 
